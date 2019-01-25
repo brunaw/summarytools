@@ -185,15 +185,33 @@ dfSummary <- function(x, round.digits = st_options("round.digits"),
   }
 
   if (!isTRUE(plain.ascii) && style == "grid" && isTRUE(graph.col)) {
-    store_imgs <- paste0("img/", parse_info$df_name)
-    message("Images used in dfSummary() will be written to ", 
-            normalizePath(store_imgs, mustWork = FALSE))
-    dir.create(normalizePath(store_imgs, mustWork = FALSE),
-               showWarnings = FALSE, recursive = TRUE)
+    store_imgs <- TRUE
+    # Determine the OS to know where to store tempfiles
+    if (.Platform$OS.type == "windows") { 
+      tmp_dir_loc <- Sys.getenv("TEMP")
+      tmp_dir_var <- "%TEMP%"
+      file_sep    <- "\\"
+    } else if (Sys.info()["sysname"] == "Darwin") {
+      tmp_dir_loc <- Sys.getenv("TMPDIR")
+      tmp_dir_var <- "$TMPDIR"
+      file_sep    <- "/"
+    } else if (.Platform$OS.type == "unix") { 
+      tmp_dir_loc <- "/tmp"
+      tmp_dir_var <- "/tmp"
+      file_sep    <- "/"
+    } else {
+      dir.create("img", showWarnings = FALSE)
+      tmp_dir_loc <- "img"
+      tmp_dir_var <- "img"
+      file_sep    <- .Platform$file.sep
+      message("temporary images used in dfSummary() will be written to ",
+              'subdirectory "img/"')
+    }
   } else {
-    store_imgs <- NA
+    store_imgs <- FALSE
   }
 
+  
   # Initialize the output data frame -------------------------------------------
 
   output <- data.frame(no               = numeric(),
@@ -391,15 +409,13 @@ crunch_factor <- function(column_data) {
                            collapse = "\\\n")
     counts_props <- align_numbers_dfs(counts, round(props, round.digits + 2))
     outlist[[2]] <- paste0("\\", counts_props, collapse = "\\\n")
-    if (isTRUE(parent.frame()$graph.col) &&
-        any(!is.na(column_data))) {
+    if (isTRUE(parent.frame()$graph.col) && any(!is.na(column_data))) {
       outlist[[3]] <- encode_graph(counts, "barplot", graph.magnif)
-      if (!is.na(parent.frame()$store_imgs)) {
-        tmp_png <- encode_graph(counts, "barplot", graph.magnif, TRUE)
-        destfile <- paste0(parent.frame()$store_imgs, "/", 
-                           parent.frame()$i, ".png")
-        file.copy(tmp_png, destfile, overwrite = TRUE)
-        outlist[[4]] <- paste0("![](", destfile, ")")
+      if (isTRUE(parent.frame()$store_imgs)) {
+        png_loc <- encode_graph(counts, "barplot", graph.magnif, TRUE)
+        outlist[[4]] <- paste0("![](", 
+                               paste(parent.frame()$tmp_dir_var, png_loc,
+                                     sep = parent.frame()$file_sep), ")")
       } else {
         outlist[[4]] <- txtbarplot(prop.table(counts))
       }
@@ -439,12 +455,11 @@ crunch_factor <- function(column_data) {
         paste("[", n_extra_levels, trs("others"), "]")
       levels(tmp_data)[(max.distinct.values + 2):n_levels] <- NA
       outlist[[3]] <- encode_graph(table(tmp_data), "barplot", graph.magnif)
-      if (!is.na(parent.frame()$store_imgs)) {
-        tmp_png <- encode_graph(table(tmp_data), "barplot", graph.magnif, TRUE)
-        destfile <- paste0(parent.frame()$store_imgs, "/", 
-                           parent.frame()$i, ".png")
-        file.copy(tmp_png, destfile, overwrite = TRUE)
-        outlist[[4]] <- paste0("![](", destfile, ")")
+      if (isTRUE(parent.frame()$store_imgs)) {
+        png_loc <- encode_graph(table(tmp_data), "barplot", graph.magnif, TRUE)
+        outlist[[4]] <- paste0("![](", 
+                               paste(parent.frame()$tmp_dir_var, png_loc,
+                                     sep = parent.frame()$file_sep), ")")
       } else {
         outlist[[4]] <- txtbarplot(prop.table(table(tmp_data)))
       }
@@ -498,12 +513,11 @@ crunch_character <- function(column_data) {
       if (isTRUE(parent.frame()$graph.col) &&
           any(!is.na(column_data))) {
         outlist[[3]] <- encode_graph(counts, "barplot", graph.magnif)
-        if (!is.na(parent.frame()$store_imgs)) {
-          tmp_png <- encode_graph(counts, "barplot", graph.magnif, TRUE)
-          destfile <- paste0(parent.frame()$store_imgs, "/", 
-                             parent.frame()$i, ".png")
-          file.copy(tmp_png, destfile, overwrite = TRUE)
-          outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(counts, "barplot", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
         } else {
           outlist[[4]] <- txtbarplot(prop.table(counts))
         }
@@ -539,12 +553,11 @@ crunch_character <- function(column_data) {
           paste("[", n_extra_values, trs("others"),"]")
         counts <- counts[1:(max.distinct.values + 1)]
         outlist[[3]] <- encode_graph(counts, "barplot", graph.magnif)
-        if (!is.na(parent.frame()$store_imgs)) {
-          tmp_png <- encode_graph(counts, "barplot", graph.magnif, TRUE)
-          destfile <- paste0(parent.frame()$store_imgs, "/", 
-                             parent.frame()$i, ".png")
-          file.copy(tmp_png, destfile, overwrite = TRUE)
-          outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(counts, "barplot", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
         } else {
           outlist[[4]] <- txtbarplot(prop.table(counts))
         }
@@ -682,12 +695,11 @@ crunch_numeric <- function(column_data, is_barcode) {
     if (isTRUE(parent.frame()$graph.col)) {
       if (length(counts) <= max.distinct.values) {
         outlist[[3]] <- encode_graph(counts, "barplot", graph.magnif)
-        if (!is.na(parent.frame()$store_imgs)) {
-          tmp_png <- encode_graph(counts, "barplot", graph.magnif, TRUE)
-          destfile <- paste0(parent.frame()$store_imgs, "/", 
-                             parent.frame()$i, ".png")
-          file.copy(tmp_png, destfile, overwrite = TRUE)
-          outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(counts, "barplot", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
         } else {
           outlist[[4]] <- txtbarplot(prop.table(counts))
         }
@@ -698,12 +710,11 @@ crunch_numeric <- function(column_data, is_barcode) {
         }
       } else {
         outlist[[3]] <- encode_graph(column_data, "histogram", graph.magnif)
-        if (!is.na(parent.frame()$store_imgs)) {
-          tmp_png <- encode_graph(column_data, "histogram", graph.magnif, TRUE)
-          destfile <- paste0(parent.frame()$store_imgs, "/", 
-                             parent.frame()$i, ".png")
-          file.copy(tmp_png, destfile, overwrite = TRUE)
-          outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(column_data, "histogram", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
         } else {
           outlist[[4]] <- txthist(column_data)
         }
@@ -745,12 +756,11 @@ crunch_time_date <- function(column_data) {
       counts_props <- align_numbers_dfs(counts, props)
       outlist[[2]] <- paste(counts_props, collapse = "\\\n")
       outlist[[3]] <- encode_graph(counts, "barplot", graph.magnif)
-      if (!is.na(parent.frame()$store_imgs)) {
-        tmp_png <- encode_graph(counts, "barplot", graph.magnif, TRUE)
-        destfile <- paste0(parent.frame()$store_imgs, "/", 
-                           parent.frame()$i, ".png")
-        file.copy(tmp_png, destfile, overwrite = TRUE)
-        outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(counts, "barplot", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
       } else {
         outlist[[4]] <- txtbarplot(prop.table(counts))
       }
@@ -769,13 +779,11 @@ crunch_time_date <- function(column_data) {
       if (isTRUE(parent.frame()$graph.col)) {
         tmp <- as.numeric(column_data)[!is.na(column_data)]
         outlist[[3]] <- encode_graph(tmp - mean(tmp), "histogram", graph.magnif)
-        if (!is.na(parent.frame()$store_imgs)) {
-          tmp_png <- encode_graph(tmp - mean(tmp), "histogram", 
-                                  graph.magnif, TRUE)
-          destfile <- paste0(parent.frame()$store_imgs, "/", 
-                             parent.frame()$i, ".png")
-          file.copy(tmp_png, destfile, overwrite = TRUE)
-          outlist[[4]] <- paste0("![](", destfile, ")")
+        if (isTRUE(parent.frame()$store_imgs)) {
+          png_loc <- encode_graph(tmp - mean(tmp), "histogram", graph.magnif, TRUE)
+          outlist[[4]] <- paste0("![](", 
+                                 paste(parent.frame()$tmp_dir_var, png_loc,
+                                       sep = parent.frame()$file_sep), ")")
         } else {
           outlist[[4]] <- txthist(tmp - mean(tmp))
         }
@@ -837,10 +845,14 @@ align_numbers_dfs <- function(counts, props) {
 encode_graph <- function(data, graph_type, graph.magnif = 1, pandoc = FALSE) {
   bg <- par('bg'=NA)
   on.exit(par(bg))
+  img_png <- ifelse(isTRUE(pandoc),
+                    tempfile(tmpdir = parent.frame(2)$tmp_dir_loc, 
+                             fileext = ".png", pattern = ""),
+                    tempfile(fileext = ".png"))
   if (graph_type == "histogram") {
-    png(img_png <- tempfile(fileext = ".png"), width = 150 * graph.magnif,
-        height = 110 * graph.magnif, units = "px", bg = "transparent")
-    mar <- par("mar" = c(0.01, 0.00, 0.01, 0.01)) # bottom, left, top, right
+    png(img_png, width = 150 * graph.magnif,
+        height = 100 * graph.magnif, units = "px", bg = "transparent")
+    mar <- par("mar" = c(0.02, 0.02, 0.02, 0.02)) # bottom, left, top, right
     on.exit(par(mar), add = TRUE)
     data <- data[!is.na(data)]
     breaks_x <- pretty(range(data), n = min(nclass.Sturges(data), 250),
@@ -855,33 +867,37 @@ encode_graph <- function(data, graph_type, graph.magnif = 1, pandoc = FALSE) {
       text("Graph Not Available", x = 0.5, y = 0.5, cex = 1)
     }
     
+    dev.off()
+    ii <- image_read(img_png)
+    ii <- image_border(image_trim(ii), color = "white", geometry = "6x2")
+    image_write(image_transparent(ii, 'white'), img_png)
+    
   } else if (graph_type == "barplot") {
     
-    png(img_png <- tempfile(fileext = ".png"), width = 150 * graph.magnif,
+    png(img_png, width = 150 * graph.magnif,
         height = 26 * length(data) * graph.magnif, units = "px",
         bg = "transparent")
-    mar <- par("mar" = c(0.05, 0.30, 0.05, 0.05)) # bottom, left, top, right
+    mar <- par("mar" = c(0.02, 0.02, 0.02, 0.02)) # bottom, left, top, right
     on.exit(par(mar), add = TRUE)
     data <- rev(data)
     barplot(data, names.arg = "", axes = FALSE, space = 0.22, #0.21,
             col = "grey97", border = "grey65", horiz = TRUE,
             xlim = c(0, sum(data)))
+
+    dev.off()
+    ii <- image_read(img_png)
+    ii <- image_border(image_trim(ii), color = "white", geometry = "6x4")
+    image_write(image_transparent(ii, 'white'), img_png)
   }
-  
-  dev.off()
+
   if (isTRUE(pandoc)) {
-    if (graph_type == "barplot") {
-      ii <- image_read(img_png)
-      ii <- image_border(image_trim(ii), color = "white", geometry = "4x2")
-      image_write(image_transparent(ii, 'white'), img_png)
-    }
-    return(img_png)
+    return(basename(img_png))
   } else {
     img_txt <- base64Encode(txt = readBin(con = img_png, what = "raw",
                                           n = file.info(img_png)[["size"]]),
                             mode = "character")
-    return(sprintf('<img style="border:none;background:none;padding:0" 
-                 src="data:image/png;base64, %s">', img_txt))
+    return(paste0('<img style="border:none;background-color:transparent;',
+                  'padding:0" src="data:image/png;base64, ', img_txt, '">'))
   }
 }
 
